@@ -112,209 +112,90 @@ npm run format        # prettier 格式化
 
 ## 部署到 Cloudflare（免费）
 
-> 下面提供 **三种部署方式，任选其一**。三者共用同一套交付物（前端构建产物 + Worker 编译脚本 + D1/R2 绑定 + Secrets），只是“如何把产物推上 Cloudflare”不同。
+采用 **GitHub 部署**：把仓库推到 GitHub，让 Cloudflare 在每次 push 后自动构建并部署。
 
-| 方式                                                    | 适用场景                       | 说明                                     |
-| ----------------------------------------------------- | -------------------------- | -------------------------------------- |
-| [方式一 · git + wrangler](#方式一--git--wrangler推荐适合有-cli)  | 本机已装 Wrangler，想一条命令部署      | `wrangler deploy`，绑定写在 `wrangler.toml` |
-| [方式二 · Dashboard 手动上传](#方式二--dashboard-手动上传适合只用网页控制台) | 只用 Cloudflare 网页控制台，不装 CLI | 编译产物手动拖到控制台                            |
-| [方式三 · GitHub 部署](#方式三--github-部署适合已有-github-仓库)      | 已有 GitHub 仓库，希望提交即自动部署     | Dashboard 连接仓库，或 GitHub Actions        |
-
-三方式的「前置准备」共享如下：
-
-**前置：构建交付物**
+### 0. 准备：构建交付物
 
 ```bash
 npm install
-npm run build               # 类型检查 + vite 构建前端 → dist/client
-npx wrangler deploy --dry-run --outdir=dist
-                            # ① 若走 CLI：直接跳到方式一
-# ② 若走手动/GitHub：生成 Worker 编译脚本（见方式二）
+npm run build
 ```
 
-***
+### 1. 创建存储资源并填 database_id
 
-### 方式一 · git + wrangler（推荐，适合有 CLI）
+1. Dashboard → **Workers & Pages → D1 → Create database**：命名 `momo-blog-db`，记下首页返回的 **Database ID**。
 
-#### 1. 登录并创建存储资源
+2. 把真实 ID **手动替换**到 `wrangler.toml` 的占位符（当前为 `REPLACE_WITH_YOUR_D1_ID`）：
 
-```bash
-wrangler login
+   ```toml
+   [[d1_databases]]
+   binding = "DB"
+   database_name = "momo-blog-db"
+   database_id = "你的真实 D1 ID"   # ← 手动替换
+   ```
 
-# 创建 D1 数据库
-npx wrangler d1 create momo-blog-db
-#  ↑ 返回的 database_id 填到 wrangler.toml 的 database_id
+   > `database_id` 是**必填**的编译期绑定字段，官方规定无法放入 Secret，必须写在 `wrangler.toml` 中。占位符未替换会导致部署失败（code 10021）。
 
-# 创建 R2 桶
-npx wrangler r2 bucket create momo-blog-storage
-```
+3. Dashboard → **Workers & Pages → R2 → Create bucket**：命名 `momo-blog-storage`（R2 无需 id）。
 
-#### 2. 设置密钥（不写入代码）
+### 2. 设置变量（务必添加完整）
+
+在 Cloudflare Worker 的 **Settings → Variables and Secrets** 中，按下表添加（`SECRET` / `SETUP_TOKEN` 类型选 **Secret（加密）**，值只读不显示）：
 
 > 依据项目安全约定：**API 密钥与请求地址必须存放在 Cloudflare Secrets/KV，不硬编码。**
 
-```bash
-npx wrangler secret put SECRET        # 会话/签名密钥，≥32 字符
-npx wrangler secret put SETUP_TOKEN   # 首次创建管理员的初始化令牌，≥20 字符
-npx wrangler secret put APP_URL       # 生产域名，例如 https://blog.example.com
-```
+| 变量名 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|
+| `SECRET` | Secret（加密） | 必填 | 会话/签名密钥，**≥32 字符**随机串（如 `openssl rand -hex 32` 生成） |
+| `SETUP_TOKEN` | Secret（加密） | 必填 | 首次创建管理员的初始化令牌，**≥20 字符**随机串 |
+| `APP_URL` | 普通变量 | 建议 | 你的 https 域名（例如 `https://cf-momo-blog.<你的子域>.workers.dev` 或自定义域名）；设了登录 Cookie 才带 `Secure` |
+| `D1_DATABASE_ID`（可选） | 不适用 | — | 见下注 |
 
-#### 3. 构建并部署
+> **关于 `D1_DATABASE_ID`**：D1 绑定必须使用 wrangler.toml 里的 `database_id`，它不能迁移到运行时 Secret。此表仅列出实际需要的变量，无需添加这个名称。
 
-```bash
-npm run build
-npx wrangler deploy
-```
+### 3. 设置 GitHub Actions 凭据（方式二需要）
 
-首次请求会自动执行 D1 建表（业务表 + better-auth 用户/会话表）。
+若走 **GitHub Actions**，还需在 GitHub 仓库 → Settings → Secrets and variables → Actions 添加：
 
-#### 4. 写入演示数据（可选，但有首页）
+| Secret | 说明 |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → 个人资料 → **API Tokens** → Create token，权限：Workers Scripts — Edit、Account Settings — Read、Workers R2 Bucket — Edit、D1 — Edit |
+| `CLOUDFLARE_ACCOUNT_ID` | Dashboard 右下角账户 ID |
 
-```bash
-npm run seed
-```
+### 4. 选择一种 GitHub 部署实现
 
-把 `assets/demo` 素材上传到 R2，并写入示例首页。可选步骤：不 seed 也能正常访问（后端会自动初始化一个空首页），seed 只是提供演示内容。
+把代码推到 GitHub 仓库，用下面任一方式接入 Cloudflare。推荐 **选项 B（GitHub Actions）**——无需在 Cloudflare 侧反复配置构建。
 
-#### 5. 首次初始化管理员
+#### 选项 A · Dashboard 连接 GitHub
 
-打开站点 → 滚动到页面底部点「管理」→「创建你的管理员账号」，输入初始化令牌 + 邮箱 + 密码（≥12 位）。之后即可「编辑页面」。
+> **重要**：Cloudflare 新 Workers UI 的创建页面**没有** "Build command / Root directory" 字段——它们在 **Settings → Build** 里。
 
-> 令牌规则：若已在 Cloudflare 设置 `SETUP_TOKEN`（Secret），必须与其一致；**未设置时可直接在网页里自行设定**（≥20 字符，首次输入即生效，令牌仅 HMAC 签名存储，管理员创建完成后入口自动关闭）。
-
-#### 6.（可选）绑定自定义域名
-
-Dashboard → Workers 详情 → 设置 → 域/触发器 → 添加自定义域，并把 `APP_URL` 设为该 https 域名，使 Cookie 携带 `Secure`。
-
-***
-
-### 方式二 · Dashboard 手动上传（适合只用网页控制台）
-
-> 说明：代码必须被 **打包/编译** 后才能作为 Worker 上传，这一步在浏览器里做不到，因此首次仍需用本机 `npx wrangler` 生成一次产物（`npx` 免全局安装）；之后的**部署与修改**都可在 Cloudflare 网页控制台完成。
-
-#### 1. 生成交付物
-
-```bash
-npm install
-npm run build                    # → dist/client（前端）
-npx wrangler deploy --dry-run --outdir=dist
-# 编译产物：dist/worker.js（主脚本，内含全部后端与依赖）
-```
-
-#### 2. 在 Dashboard 创建 D1/R2
-
-- Workers & Pages → D1 → Create database → 命名 `momo-blog-db`，记下返回的 `database_id`，填进 `wrangler.toml` 后重新运行上一步 `dry-run`。
-
-- Workers & Pages → R2 → Create bucket → 命名 `momo-blog-storage`。
-
-#### 3. 创建 Worker
-
-Workers & Pages → Create → Worker → 命名 `momo-blog` → Deploy。
-
-#### 4. 上传主脚本
-
-打开该 Worker → **编辑代码** → 清空默认内容，把 `dist/worker.js` 的**全部内容粘贴**进去 → 右上角 **Deploy**。
-
-> 注意：控制台编辑保存即重新部署，且会覆盖脚本源码。之后若再改用方式一/GitHub，会以云端这份为准。
-
-#### 5. 上传静态前端（Assets）
-
-- Worker 详情 → 打开 **Assets**（静态资源）面板 → 上传 `dist/client/` 里的所有文件（含 `index.html` 与 `assets/` 子目录）。
-
-- 开启 **Serve Single-Page-Application**（404 回退到 `index.html`）。**必须开启**，否则刷新子路由会 404。
-
-- 绑定名保持 `ASSETS`（与代码一致）。
-
-#### 6. 绑定 D1 与 R2
-
-Worker → **Settings** → **Variables and Secrets** → **Add binding**：
-
-| 绑定类型        | 名称        | 指向                  |
-| ----------- | --------- | ------------------- |
-| D1 Database | `DB`      | `momo-blog-db`      |
-| R2 Bucket   | `STORAGE` | `momo-blog-storage` |
-
-#### 7. 设置密钥 / 变量
-
-同样在 Variables and Secrets 中，`SECRET`、`SETUP_TOKEN` 以 **Secret** 类型添加，`APP_URL` 以普通变量添加（值是你的 https 域名）。密钥不写入代码仓库。
-
-#### 8. 初始化管理员
-
-打开站点 → 登录 → 使用 `SETUP_TOKEN` 创建管理员账号（见方式一第 5 步）。至此即可使用。
-
-> **seed 演示数据的限制**：`npm run seed` 需要本机 wrangler 连远程写 D1/R2，纯网页控制台无法执行。Dashboard 手动部署若想有示例首页，需在本机 `wrangler login` 后运行 `npm run seed` 一次；否则直接进入管理员后台自行编辑即可（无需 seed）。
-
-***
-
-### 方式三 · GitHub 部署（适合已有 GitHub 仓库）
-
-把仓库推到 GitHub，让 Cloudflare 在每次 push 后自动构建并部署。两种实现二选一：
-
-#### 选项 A · Dashboard 连接 GitHub（贴合"仅网页控制台"）
-
-> **重要说明**：
-> 1. Cloudflare 新 Workers UI 创建页面**没有**"Build command / Root directory"等字段——构建配置在 **Settings → Build** 里。
-> 2. **Runtime Bindings（D1/R2/KV）必须在 Worker 成功部署后才能在 Dashboard 添加**。首次部署时 wrangler 会校验 `wrangler.toml` 里声明的所有绑定，占位符 ID 会被直接拒掉（code 10021）。所以本项目 `wrangler.toml` 故意**不写** D1/R2 绑定，首部署成功后通过 Dashboard 手动添加。
-
-##### 第一阶段：让 Worker 裸机部署成功
-
-1. 把项目推到 GitHub 仓库（`main` 分支）。
-2. Workers & Pages → **Create** → Worker → **Connect to Git** → 连接 GitHub，选中仓库，分支选 `main` → **Create**。
-3. 首次部署会用默认构建配置（不会跑前端构建），大概率失败。不要急，先进 Worker 详情页 **Settings → Build**，改成：
+1. 把项目推到 GitHub（`main` 分支）。
+2. Workers & Pages → **Create** → Worker → **Connect to Git** → 选中仓库、分支 `main` → **Create**。
+3. 进 Worker 详情 → **Settings → Build**，改成：
 
    | 字段 | 值 |
    |---|---|
-   | **Build command** | `npm ci && npm run build`（先生成 `dist/client`，让 `[assets]` 有东西可上传） |
-   | **Deploy command** | 保持默认 `npx wrangler deploy` |
+   | **Build command** | `npm ci && npm run build` |
+   | **Deploy command** | `npx wrangler deploy`（默认） |
    | **Root directory** | 留空 |
 
-   Save 后 Cloudflare 会自动触发重新构建（或手动点 **Retry deployment**）。
+   Save 后触发重新构建（或点 **Retry deployment**）。
 
-4. 这次应该能成功——Worker 起来了，但访问 API 会报 `DB is not defined` 之类的运行时错误（绑定还没加），**这是正常的，先别 panic**。
-
-##### 第二阶段：在 Dashboard 上补绑定和密钥
-
-Worker 成功部署后才能在 Dashboard 添加 Runtime Bindings。
-
-1. **Workers & Pages → D1 → Create database**：名字 `momo-blog-db`，Region 自选。
-2. **Workers & Pages → R2 → Create bucket**：名字 `momo-blog-storage`。
-3. 回到 Worker 详情页 → **Settings → Bindings → Add binding**：
-
-   | 类型 | 变量名（代码里用的） | 指向 |
-   |---|---|---|
-   | D1 Database | `DB` | `momo-blog-db` |
-   | R2 Bucket | `STORAGE` | `momo-blog-storage` |
-
-   （`ASSETS` Fetcher 由 `wrangler.toml [assets]` 自动提供，不需要手动加）
-
-4. **Settings → Variables and Secrets → Add Secret**：
-
-   | Secret | 值 |
-   |---|---|
-   | `SECRET` | ≥32 字符的随机字符串（签名/会话密钥） |
-   | `SETUP_TOKEN` | ≥20 字符的随机字符串（首次管理员初始化令牌） |
-   | `APP_URL` | 你的 https 域名（例如 `https://momo-blog-cf.workers.dev` 或自定义域名） |
-
-5. 保存后 Worker 热更新完成——现在访问首页应该能正常看到内容（或进入管理员后台初始化）。
+4. 部署成功后（`database_id` 已替换为真实值），访问站点的 API 即可正常读写。
 
 #### 选项 B · GitHub Actions + wrangler-action
 
-需要两个仓库 Secret（Settings → Secrets and variables → Actions）：
+已提供 [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)，添加第 3 步的 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 两个仓库 Secret 后，push 到 `main` 即自动构建部署。
 
-- `CLOUDFLARE_API_TOKEN`：Cloudflare → 我的个人资料 → **API Tokens** → Create token，勾选权限：`Workers Scripts — Edit`、`Account Settings — Read`、`Workers R2 Bucket — Edit`、D1 相关 Edit（若 token 类型可选）。
-
-- `CLOUDFLARE_ACCOUNT_ID`：Dashboard 右下角账户 ID。
-
-创建 `.github/workflows/deploy.yml`：
+`deploy.yml` 核心：
 
 ```yaml
 name: Deploy to Cloudflare Workers
-
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -335,9 +216,15 @@ jobs:
 
 > - 该方式要求 `wrangler.toml` 中 `database_id` 已填真实值。
 >
-> - Secrets（`SECRET`/`SETUP_TOKEN`/`APP_URL`）不随代码提交，在 Dashboard 的 Worker 设置里添加一次即可，Actions 每次 deploy 不会覆盖它们。
+> - D1/R2 绑定在云端已创建并写了 `wrangler.toml`，`wrangler deploy` 会按 `name`/绑定匹配既有 Worker 与资源。
 >
-> - D1/R2 绑定在云端已存在，`wrangler deploy` 会按 `wrangler.toml` 的 `name`/绑定匹配既有 Worker 与资源。
+> - Secrets（`SECRET`/`SETUP_TOKEN`/`APP_URL`）在 Dashboard 的 Worker 设置里添加一次即可；`wrangler.toml` 已开启 `keep_vars = true`，Actions 每次 deploy 不会覆盖它们。
+
+### 5. 首次初始化管理员
+
+打开站点 → 滚动到底部点「管理」→「创建你的管理员账号」，输入**初始化令牌 + 邮箱 + 密码（≥12 位）**，之后即可「编辑页面」。
+
+> 令牌规则：若已在 Cloudflare 设置 `SETUP_TOKEN`（加密 Secret），必须与其一致；**未设置时可直接在网页里自行设定**（≥20 字符，首次输入即生效，令牌仅 HMAC 签名存储，管理员创建完成后入口自动关闭）。
 
 ***
 

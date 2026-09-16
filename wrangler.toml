@@ -21,10 +21,12 @@ not_found_handling = "single-page-application"
 # DB / STORAGE 是资源引用（非密钥），可安全提交。
 
 # D1 数据库
+# database_id 为必填项，需手动替换成你创建数据库时返回的 ID
+# （Dashboard → Workers & Pages → D1 → 你的数据库 → Database ID）
 [[d1_databases]]
 binding = "DB"
 database_name = "momo-blog-db"
-database_id = "9f3a5555-ffb1-4cb0-abeb-a634a22c08c7"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
 
 # R2 存储（媒体文件）
 [[r2_buckets]]
