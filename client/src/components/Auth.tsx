@@ -61,7 +61,7 @@ export function LoginDialog({ onClose }: { onClose: () => void }) {
               autoComplete="off"
             />
             <small>
-              在此项目的 data/setup-token.txt 中查看，仅保存在你的电脑上。
+              在 Cloudflare Dashboard → Variables and Secrets 中查看 SETUP_TOKEN 的值。
             </small>
           </label>
         )}
