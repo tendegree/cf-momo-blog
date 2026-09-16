@@ -3,6 +3,9 @@ main = "server/worker.ts"
 compatibility_date = "2026-06-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
+# Git 集成每次部署会执行 wrangler deploy，默认会清掉 Dashboard 上的明文变量；
+# keep_vars = true 让 Dashboard 添加的变量（含 Secret）在部署后保留。
+keep_vars = true
 
 # 静态前端（Vite 构建产物）——由同一个 Worker 一并托管
 # 注意：[assets] 是 wrangler 自动上传静态文件用的，不是 Runtime binding 声明，

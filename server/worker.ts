@@ -124,6 +124,11 @@ const hmac = (id: string, secret: string) =>
   createHmac("sha256", secret).update(id).digest("hex");
 
 async function getVisitor(c: AnyCtx): Promise<string> {
+  // SECRET 缺失时 createHmac 会抛无信息异常，这里提前给出明确提示：
+  // Git 集成部署的 wrangler deploy 会清掉 Dashboard 明文变量（keep_vars 已开启），
+  // 若被清掉需重新以 Secret（加密）类型添加。
+  if (!c.env.SECRET)
+    throw new HttpError(500, "服务端未配置 SECRET，请在 Dashboard → Variables and Secrets 以 Secret 类型添加后重试。");
   const cookie: string = String(c.req.header("cookie") || "");
   const raw = cookie
     .split(";")
