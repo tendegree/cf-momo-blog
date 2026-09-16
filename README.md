@@ -250,19 +250,50 @@ Worker → **Settings** → **Variables and Secrets** → **Add binding**：
 
 #### 选项 A · Dashboard 连接 GitHub（贴合"仅网页控制台"）
 
-> **重要说明**：Cloudflare 新 Workers UI 创建页面**没有**"Build command / Root directory / Build output dir"这些字段。这是 Workers 与旧 Pages UI 的入口差异——Worker 的构建配置需要在 **创建完成后**，从 Worker 详情页 **Settings → Build** 进入。本项目因为用 `wrangler.toml` 的 `[assets] directory` 声明了静态前端路径，所以 Cloudflare Builds 只需要跑一个构建命令即可，不需要填 output dir 或 root directory。
+> **重要说明**：
+> 1. Cloudflare 新 Workers UI 创建页面**没有**"Build command / Root directory"等字段——构建配置在 **Settings → Build** 里。
+> 2. **Runtime Bindings（D1/R2/KV）必须在 Worker 成功部署后才能在 Dashboard 添加**。首次部署时 wrangler 会校验 `wrangler.toml` 里声明的所有绑定，占位符 ID 会被直接拒掉（code 10021）。所以本项目 `wrangler.toml` 故意**不写** D1/R2 绑定，首部署成功后通过 Dashboard 手动添加。
 
-1. 把项目推到 GitHub 仓库。
-2. Workers & Pages → **Create** → Worker → **Connect to Git** → 连接 GitHub，选中仓库，分支选 `main`。
-3. 首次部署完成后，从该 Worker 详情页进入 **Settings → Build**，修改构建配置：
+##### 第一阶段：让 Worker 裸机部署成功
 
-   - **Build command**：`npm ci && npm run build`（让 Cloudflare 在 deploy 前先生成 `dist/client`）
-   - **Deploy command**：保持默认 `npx wrangler deploy`（wrangler.toml 里的 `[assets] directory = "./dist/client"` 会被自动识别）
-   - Root directory **留空**（项目就是仓库根目录）
+1. 把项目推到 GitHub 仓库（`main` 分支）。
+2. Workers & Pages → **Create** → Worker → **Connect to Git** → 连接 GitHub，选中仓库，分支选 `main` → **Create**。
+3. 首次部署会用默认构建配置（不会跑前端构建），大概率失败。不要急，先进 Worker 详情页 **Settings → Build**，改成：
 
-   保存后 Cloudflare 会在下次 push 时按新配置构建。
+   | 字段 | 值 |
+   |---|---|
+   | **Build command** | `npm ci && npm run build`（先生成 `dist/client`，让 `[assets]` 有东西可上传） |
+   | **Deploy command** | 保持默认 `npx wrangler deploy` |
+   | **Root directory** | 留空 |
 
-4. D1/R2 绑定、`SECRET`/`SETUP_TOKEN`/`APP_URL` 密钥，在 **Settings → Bindings / Variables and Secrets** 中按方式二第 6–7 步配置一次。
+   Save 后 Cloudflare 会自动触发重新构建（或手动点 **Retry deployment**）。
+
+4. 这次应该能成功——Worker 起来了，但访问 API 会报 `DB is not defined` 之类的运行时错误（绑定还没加），**这是正常的，先别 panic**。
+
+##### 第二阶段：在 Dashboard 上补绑定和密钥
+
+Worker 成功部署后才能在 Dashboard 添加 Runtime Bindings。
+
+1. **Workers & Pages → D1 → Create database**：名字 `momo-blog-db`，Region 自选。
+2. **Workers & Pages → R2 → Create bucket**：名字 `momo-blog-storage`。
+3. 回到 Worker 详情页 → **Settings → Bindings → Add binding**：
+
+   | 类型 | 变量名（代码里用的） | 指向 |
+   |---|---|---|
+   | D1 Database | `DB` | `momo-blog-db` |
+   | R2 Bucket | `STORAGE` | `momo-blog-storage` |
+
+   （`ASSETS` Fetcher 由 `wrangler.toml [assets]` 自动提供，不需要手动加）
+
+4. **Settings → Variables and Secrets → Add Secret**：
+
+   | Secret | 值 |
+   |---|---|
+   | `SECRET` | ≥32 字符的随机字符串（签名/会话密钥） |
+   | `SETUP_TOKEN` | ≥20 字符的随机字符串（首次管理员初始化令牌） |
+   | `APP_URL` | 你的 https 域名（例如 `https://momo-blog-cf.workers.dev` 或自定义域名） |
+
+5. 保存后 Worker 热更新完成——现在访问首页应该能正常看到内容（或进入管理员后台初始化）。
 
 #### 选项 B · GitHub Actions + wrangler-action
 
