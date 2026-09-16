@@ -1,0 +1,7 @@
+# wrangler dev 时使用。生产环境请用 wrangler secret put 设置同名密钥。
+# 会话/签名密钥（至少 32 字符）
+SECRET=dev-secret-change-me-0000000000000000000000000
+# 初始化令牌：首次创建管理员账号时输入（至少 20 字符）
+SETUP_TOKEN=dev-setup-token-000000000000000
+# 生产域名，留空则自动推导
+# APP_URL=https://blog.example.com
