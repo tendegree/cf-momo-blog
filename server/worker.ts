@@ -341,21 +341,45 @@ router.post(`${API}/setup`, async (c) => {
   const auth = c.var.auth;
   if (await auth.initialized())
     return c.json({ error: "管理员已创建，初始化入口已关闭。" }, 409);
+  if (!c.env.SECRET)
+    return c.json({ error: "服务端未配置 SECRET，请在 Dashboard → Variables and Secrets 以 Secret 类型添加后重试。" }, 500);
   const input = z
     .object({ token: z.string().min(20).max(256), email: z.email(), password: z.string().min(12).max(128) })
     .safeParse(await c.req.json());
   if (!input.success)
     return c.json({ error: "请填写有效邮箱、初始化令牌和至少 12 位密码。" }, 400);
-  const expected = c.env.SETUP_TOKEN || "";
-  const a = new TextEncoder().encode(input.data.token);
-  const e = new TextEncoder().encode(expected);
-  let ok = a.length > 0 && a.length === e.length;
-  if (ok) {
-    let diff = 0;
-    for (let i = 0; i < a.length; i++) diff |= a[i] ^ e[i];
-    ok = diff === 0;
+  // 令牌校验：
+  // 1) Dashboard 设置了 SETUP_TOKEN（Secret）→ 必须与其一致（优先）。
+  // 2) 未设置 → 首次 setup 时允许在网页直接设定令牌（HMAC 签名后存 settings 表），
+  //    之后重试/换浏览器需输入相同令牌。令牌只在初始化阶段使用，管理员创建完成后入口关闭。
+  const expected =
+    c.env.SETUP_TOKEN ||
+    (await c.var.db.get<{ value: string }>("SELECT value FROM settings WHERE key='setupTokenHmac'"))?.value ||
+    "";
+  if (c.env.SETUP_TOKEN) {
+    const a = new TextEncoder().encode(input.data.token);
+    const e = new TextEncoder().encode(expected);
+    let ok = a.length === e.length;
+    if (ok) {
+      let diff = 0;
+      for (let i = 0; i < a.length; i++) diff |= a[i] ^ e[i];
+      ok = diff === 0;
+    }
+    if (!ok) return c.json({ error: "初始化令牌不正确。" }, 403);
+  } else {
+    const signed = hmac(input.data.token, c.env.SECRET);
+    if (expected) {
+      // 已有网页设定的令牌：校验一致性
+      if (signed !== expected)
+        return c.json({ error: "初始化令牌不正确。" }, 403);
+    } else {
+      // 首次设定：保存 HMAC 签名（不存明文）
+      await c.var.db.run(
+        "INSERT INTO settings(key,value) VALUES('setupTokenHmac',?)",
+        signed,
+      );
+    }
   }
-  if (!ok) return c.json({ error: "初始化令牌不正确。" }, 403);
   try {
     await auth.signup({ email: input.data.email, password: input.data.password });
   } catch {

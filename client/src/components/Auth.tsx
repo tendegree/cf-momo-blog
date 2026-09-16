@@ -61,7 +61,7 @@ export function LoginDialog({ onClose }: { onClose: () => void }) {
               autoComplete="off"
             />
             <small>
-              在 Cloudflare Dashboard → Variables and Secrets 中查看 SETUP_TOKEN 的值。
+              在此设定你的初始化令牌（至少 20 位，仅初始化时使用）。若已在 Cloudflare 设置 SETUP_TOKEN，则需与其一致。
             </small>
           </label>
         )}
