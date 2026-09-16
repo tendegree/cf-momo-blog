@@ -12,6 +12,7 @@ import {
   createDb,
   applySchema,
   ensureStartedAt,
+  ensureHomeContent,
   readHome,
   type BusinessDb,
 } from "./db.js";
@@ -30,6 +31,7 @@ function ensureReady(env: Env): Promise<void> {
     await applySchema(env.DB);
     const db = createDb(env.DB);
     await ensureStartedAt(db);
+    await ensureHomeContent(db);
   })();
   return ready;
 }

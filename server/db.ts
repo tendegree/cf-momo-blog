@@ -101,6 +101,38 @@ export async function ensureStartedAt(db: BusinessDb): Promise<void> {
   );
 }
 
+/**
+ * 确保 site_content 至少有一条默认记录，避免 readHome 因空表而抛「首页尚未初始化」。
+ * 这是 Cloudflare（Git 部署）下替代 seed 脚本的最小初始化：写入一个空首页，
+ * 前端可正常渲染，管理员登录后在线编辑即可。已存在数据时不覆盖。
+ */
+export async function ensureHomeContent(db: BusinessDb): Promise<void> {
+  const empty: HomeContent = {
+    profile: {
+      name: "",
+      avatarId: null,
+      headline: "",
+      introduction: "",
+      description: "",
+      eyebrow: "",
+      motto: "",
+      photoId: "",
+      photoCaption: "",
+      demo: true,
+    },
+    social: { github: "", xiaohongshu: "", email: "" },
+    projects: [],
+    articles: [],
+    photos: [],
+    collections: [],
+    tracks: [],
+  };
+  await db.run(
+    "INSERT OR IGNORE INTO site_content(id,revision,data) VALUES(1,1,?)",
+    JSON.stringify(empty),
+  );
+}
+
 export async function readHome(db: BusinessDb): Promise<HomeResponse> {
   const row = await db.get<{ revision: number; data: string }>(
     "SELECT revision,data FROM site_content WHERE id=1",
