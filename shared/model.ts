@@ -217,8 +217,9 @@ export function referencedMedia(
   return refs;
 }
 export function sydneyDay(date: Date) {
+  // 日期统计基于北京时间（Asia/Shanghai，无夏令时），与主页时钟保持一致
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Australia/Sydney",
+    timeZone: "Asia/Shanghai",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

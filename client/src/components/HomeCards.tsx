@@ -173,8 +173,8 @@ export function ClockCard({ now }: { now: Date }) {
       clearInterval(timer);
     };
   }, []);
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Australia/Sydney",
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -182,17 +182,17 @@ export function ClockCard({ now }: { now: Date }) {
     .format(now)
     .split(":");
   const weekday = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Australia/Sydney",
+    timeZone: "Asia/Shanghai",
     weekday: "short",
   }).format(now);
-  const zone = new Intl.DateTimeFormat("en-AU", {
-    timeZone: "Australia/Sydney",
+  const zone = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
     timeZoneName: "short",
   })
     .formatToParts(now)
     .find((p) => p.type === "timeZoneName")?.value;
-  const offset = new Intl.DateTimeFormat("en-AU", {
-    timeZone: "Australia/Sydney",
+  const offset = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
     timeZoneName: "shortOffset",
   })
     .formatToParts(now)
@@ -211,9 +211,9 @@ export function ClockCard({ now }: { now: Date }) {
             ? "雪"
             : "雨";
   return (
-    <section className="card clock-card" aria-label="悉尼当地时间">
+    <section className="card clock-card" aria-label="北京时间">
       <div className="clock-top">
-        <span className="eyebrow">LOCAL TIME / SYDNEY</span>
+        <span className="eyebrow">LOCAL TIME / BEIJING</span>
         <span
           className="weather"
           title={
