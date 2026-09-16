@@ -153,26 +153,27 @@ npm run build
 
 > **关于 `D1_DATABASE_ID`**：D1 绑定必须使用 wrangler.toml 里的 `database_id`，它不能迁移到运行时 Secret。此表仅列出实际需要的变量，无需添加这个名称。
 
-### 3. 设置 GitHub Actions 凭据（方式二需要）
-
-若走 **GitHub Actions**，还需在 GitHub 仓库 → Settings → Secrets and variables → Actions 添加：
-
-| Secret | 说明 |
-|---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare → 个人资料 → **API Tokens** → Create token，权限：Workers Scripts — Edit、Account Settings — Read、Workers R2 Bucket — Edit、D1 — Edit |
-| `CLOUDFLARE_ACCOUNT_ID` | Dashboard 右下角账户 ID |
-
 ### 4. 选择一种 GitHub 部署实现
 
-把代码推到 GitHub 仓库，用下面任一方式接入 Cloudflare。推荐 **选项 B（GitHub Actions）**——无需在 Cloudflare 侧反复配置构建。
+> 两种方式**二选一**，都依赖第 1 步已把真实 `database_id` 写进 `wrangler.toml`、第 2 步已在 Cloudflare 配好变量。
 
-#### 选项 A · Dashboard 连接 GitHub
+---
 
-> **重要**：Cloudflare 新 Workers UI 的创建页面**没有** "Build command / Root directory" 字段——它们在 **Settings → Build** 里。
+#### 方式 A · GitHub（fork）部署（推荐新手）
 
-1. 把项目推到 GitHub（`main` 分支）。
-2. Workers & Pages → **Create** → Worker → **Connect to Git** → 选中仓库、分支 `main` → **Create**。
-3. 进 Worker 详情 → **Settings → Build**，改成：
+在 **GitHub 网页**上 fork 本项目并修改 `database_id`，再让 Cloudflare 连接你 fork 的仓库，push 后自动构建部署。
+
+1. 在 GitHub 打开本仓库 → 点右上角 **Fork**（会得到一份属于你的副本）。
+
+2. 在你 **fork 后的仓库**里，把 `wrangler.toml` 的占位符改成你的真实 D1 ID（GitHub 网页可直接编辑）：
+   - 进入 `wrangler.toml` → 点铅笔图标编辑 → 把 `database_id = "REPLACE_WITH_YOUR_D1_ID"` 改成 `database_id = "你的真实 D1 ID"` → **Commit changes**（提交到 `main` 分支）。
+
+   > 直接在 GitHub 网页改即可，不需要本地 git。占位符未替换会导致部署失败（code 10021）。
+
+3. 将 fork 的仓库连接到 Cloudflare：
+   - Workers & Pages → **Create** → Worker → **Connect to Git** → 选中你的 fork 仓库、分支 `main` → **Create**。
+
+4. 进 Worker 详情 → **Settings → Build**，改成：
 
    | 字段 | 值 |
    |---|---|
@@ -180,13 +181,32 @@ npm run build
    | **Deploy command** | `npx wrangler deploy`（默认） |
    | **Root directory** | 留空 |
 
-   Save 后触发重新构建（或点 **Retry deployment**）。
+   Save 后 Cloudflare 自动构建部署（或点 **Retry deployment**）。
 
-4. 部署成功后（`database_id` 已替换为真实值），访问站点的 API 即可正常读写。
+5. 访问站点 API 验证可正常读写。
 
-#### 选项 B · GitHub Actions + wrangler-action
+> **特点**：全程在 GitHub + Cloudflare 网页完成，无需本地命令、无需配 GitHub Actions 凭据，适合不想碰 CLI 的用户。对应 Cloudflare 的「Git integration」能力。
 
-已提供 [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)，添加第 3 步的 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 两个仓库 Secret 后，push 到 `main` 即自动构建部署。
+---
+
+#### 方式 B · GitHub Actions 自动部署（推荐进阶）
+
+在**你自己的仓库**里启用 GitHub Actions，push 到 `main` 即自动构建并部署（适合本地改代码、希望有完整 CI 的开发者）。
+
+1. 把项目推到你的 GitHub 仓库（`main` 分支）。
+
+2. 在 **GitHub → 仓库 → Settings → Secrets and variables → Actions** 添加两个 Secret：
+
+   | Secret | 说明 |
+   |---|---|
+   | `CLOUDFLARE_API_TOKEN` | Cloudflare → 个人资料 → **API Tokens** → Create token，权限：Workers Scripts — Edit、Account Settings — Read、Workers R2 Bucket — Edit、D1 — Edit |
+   | `CLOUDFLARE_ACCOUNT_ID` | Dashboard 右下角账户 ID |
+
+3. 仓库已有 [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)。确认其中 `wrangler.toml` 的 `database_id` 已是真实值（在你本地/仓库中替换占位符）。
+
+4. push 到 `main`，Actions 自动执行 `npm ci && npm run build` 后 `wrangler deploy`。
+
+5. 访问站点 API 验证可正常读写。
 
 `deploy.yml` 核心：
 
