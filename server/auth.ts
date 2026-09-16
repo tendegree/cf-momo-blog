@@ -1,7 +1,5 @@
 import { betterAuth } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
-import { Kysely } from "kysely";
-import { D1Dialect } from "kysely-d1";
 import type { Context } from "hono";
 import type { Env } from "./env.js";
 import type { BusinessDb } from "./db.js";
@@ -32,7 +30,10 @@ export interface AuthHandle {
 }
 
 /**
- * 创建认证。better-auth 通过 kysely(over D1) 同时完成建表迁移与查询。
+ * 创建认证。better-auth 直接接收 D1Database（env.DB）——它会自动挂上
+ * Kysely adapter、正确识别数据库类型，并完成自己的表迁移（user/session/account/verification）。
+ * 不能手动包一层 Kysely(D1Dialect) 再传入，否则 better-auth 无法推断数据库类型，
+ * 迁移时会回退 sqlite 并 process.exit(1) 崩溃。
  */
 export function createAuth(env: Env, db: BusinessDb): Promise<AuthHandle> {
   const baseURL = env.APP_URL || "http://127.0.0.1:8787"; // wrangler dev 默认端口
@@ -46,12 +47,8 @@ export function createAuth(env: Env, db: BusinessDb): Promise<AuthHandle> {
     "http://localhost:8787",
   ];
 
-  const kysely = new Kysely({
-    dialect: new D1Dialect({ database: env.DB }),
-  });
-
   const config = {
-    database: kysely, // better-auth 经 kysely 访问 D1（迁移 + 查询共用）
+    database: env.DB, // 直接传 D1Database，让 better-auth 自行识别类型并迁移
     baseURL,
     secret: env.SECRET,
     trustedOrigins,
