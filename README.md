@@ -121,7 +121,7 @@ npm install
 npm run build
 ```
 
-### 1. 创建存储资源并填 database_id
+### 1. 创建存储资源并填 database\_id
 
 1. Dashboard → **Workers & Pages → D1 → Create database**：命名 `momo-blog-db`，记下首页返回的 **Database ID**。
 
@@ -144,20 +144,20 @@ npm run build
 
 > 依据项目安全约定：**API 密钥与请求地址必须存放在 Cloudflare Secrets/KV，不硬编码。**
 
-| 变量名 | 类型 | 是否必填 | 说明 |
-|---|---|---|---|
-| `SECRET` | Secret（加密） | 必填 | 会话/签名密钥，**≥32 字符**随机串（如 `openssl rand -hex 32` 生成） |
-| `SETUP_TOKEN` | Secret（加密） | 必填 | 首次创建管理员的初始化令牌，**≥20 字符**随机串 |
-| `APP_URL` | 普通变量 | 建议 | 你的 https 域名（例如 `https://cf-momo-blog.<你的子域>.workers.dev` 或自定义域名）；设了登录 Cookie 才带 `Secure` |
-| `D1_DATABASE_ID`（可选） | 不适用 | — | 见下注 |
+| 变量名                  | 类型         | 是否必填 | 说明                                                                                       |
+| -------------------- | ---------- | ---- | ---------------------------------------------------------------------------------------- |
+| `SECRET`             | Secret（加密） | 必填   | 会话/签名密钥，**≥32 字符**随机串（如 `openssl rand -hex 32` 生成）                                       |
+| `SETUP_TOKEN`        | Secret（加密） | 必填   | 首次创建管理员的初始化令牌，**≥20 字符**随机串                                                              |
+| `APP_URL`            | 普通变量       | 建议   | 你的 https 域名（例如 `https://cf-momo-blog.<你的子域>.workers.dev` 或自定义域名）；设了登录 Cookie 才带 `Secure` |
+| `D1_DATABASE_ID`（可选） | 不适用        | —    | 见下注                                                                                      |
 
-> **关于 `D1_DATABASE_ID`**：D1 绑定必须使用 wrangler.toml 里的 `database_id`，它不能迁移到运行时 Secret。此表仅列出实际需要的变量，无需添加这个名称。
+> **关于** **`D1_DATABASE_ID`**：D1 绑定必须使用 wrangler.toml 里的 `database_id`，它不能迁移到运行时 Secret。此表仅列出实际需要的变量，无需添加这个名称。
 
 ### 4. 选择一种 GitHub 部署实现
 
 > 两种方式**二选一**，都依赖第 1 步已把真实 `database_id` 写进 `wrangler.toml`、第 2 步已在 Cloudflare 配好变量。
 
----
+***
 
 #### 方式 A · GitHub（fork）部署（推荐新手）
 
@@ -165,48 +165,72 @@ npm run build
 
 1. 在 GitHub 打开本仓库 → 点右上角 **Fork**（会得到一份属于你的副本）。
 
-2. 在你 **fork 后的仓库**里，把 `wrangler.toml` 的占位符改成你的真实 D1 ID（GitHub 网页可直接编辑）：
-   - 进入 `wrangler.toml` → 点铅笔图标编辑 → 把 `database_id = "REPLACE_WITH_YOUR_D1_ID"` 改成 `database_id = "你的真实 D1 ID"` → **Commit changes**（提交到 `main` 分支）。
+2. 在 Cloudflare 创建 R2 与 D1（**名称与 `wrangler.toml` 必须一致**）：
+
+   | 资源 | Dashboard 路径 | 创建时的名称 | wrangler.toml 对应项 |
+   |---|---|---|---|
+   | D1 数据库 | Workers & Pages → **D1** → Create database | `momo-blog-db` | `binding = "DB"`、`database_name = "momo-blog-db"` |
+   | R2 存储桶 | Workers & Pages → **R2** → Create bucket | `momo-blog-storage` | `binding = "STORAGE"`、`bucket_name = "momo-blog-storage"` |
+
+   建好后回到 D1 详情页，复制顶部 **Database ID**（UUID）。
+
+   > 变量名（代码里用的 `env.DB` / `env.STORAGE`）对应上表 `binding`。若你在 Dashboard 手动绑定时名称写错，运行时就会出现 `DB is not defined`。
+
+3. 在你 **fork 后的仓库**里，把 `wrangler.toml` 的占位符改成你的真实 D1 ID（GitHub 网页可直接编辑）：
+
+   - 进入 `wrangler.toml` → 点铅笔图标编辑 → 把 `database_id = "REPLACE_WITH_YOUR_D1_ID"` 改成 `database_id = "上一步复制的 D1 ID"` → **Commit changes**（提交到 `main` 分支）。
 
    > 直接在 GitHub 网页改即可，不需要本地 git。占位符未替换会导致部署失败（code 10021）。
 
-3. 将 fork 的仓库连接到 Cloudflare：
+4. 将 fork 的仓库连接到 Cloudflare：
+
    - Workers & Pages → **Create** → Worker → **Connect to Git** → 选中你的 fork 仓库、分支 `main` → **Create**。
 
-4. 进 Worker 详情 → **Settings → Build**，改成：
+5. 进 Worker 详情 → **Settings → Build**，改成：
 
-   | 字段 | 值 |
-   |---|---|
-   | **Build command** | `npm ci && npm run build` |
-   | **Deploy command** | `npx wrangler deploy`（默认） |
-   | **Root directory** | 留空 |
+   | 字段            | 值                         |
+   | ------------- | ------------------------- |
+   | **构建命令**      | `npm ci && npm run build` |
+   | **部署命令（默认的）** | `npx wrangler deploy`（默认） |
+   | **根目录**       | 留空                        |
 
    Save 后 Cloudflare 自动构建部署（或点 **Retry deployment**）。
 
-5. 访问站点 API 验证可正常读写。
+6. 访问站点 API 验证可正常读写。（D1/R2 绑定写在 `wrangler.toml`，deploy 时会按上表名称自动匹配云端资源，无需再手动添加 Binding）
 
 > **特点**：全程在 GitHub + Cloudflare 网页完成，无需本地命令、无需配 GitHub Actions 凭据，适合不想碰 CLI 的用户。对应 Cloudflare 的「Git integration」能力。
 
----
+***
 
 #### 方式 B · GitHub Actions 自动部署（推荐进阶）
 
 在**你自己的仓库**里启用 GitHub Actions，push 到 `main` 即自动构建并部署（适合本地改代码、希望有完整 CI 的开发者）。
 
-1. 把项目推到你的 GitHub 仓库（`main` 分支）。
+1. 在 Cloudflare 创建 R2 与 D1（**名称与 `wrangler.toml` 必须一致**）：
 
-2. 在 **GitHub → 仓库 → Settings → Secrets and variables → Actions** 添加两个 Secret：
+   | 资源 | Dashboard 路径 | 创建时的名称 | wrangler.toml 对应项 |
+   |---|---|---|---|
+   | D1 数据库 | Workers & Pages → **D1** → Create database | `momo-blog-db` | `binding = "DB"`、`database_name = "momo-blog-db"` |
+   | R2 存储桶 | Workers & Pages → **R2** → Create bucket | `momo-blog-storage` | `binding = "STORAGE"`、`bucket_name = "momo-blog-storage"` |
 
-   | Secret | 说明 |
-   |---|---|
-   | `CLOUDFLARE_API_TOKEN` | Cloudflare → 个人资料 → **API Tokens** → Create token，权限：Workers Scripts — Edit、Account Settings — Read、Workers R2 Bucket — Edit、D1 — Edit |
-   | `CLOUDFLARE_ACCOUNT_ID` | Dashboard 右下角账户 ID |
+   建好后回到 D1 详情页，复制顶部 **Database ID**（UUID）。
 
-3. 仓库已有 [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)。确认其中 `wrangler.toml` 的 `database_id` 已是真实值（在你本地/仓库中替换占位符）。
+   > 变量名（代码里用的 `env.DB` / `env.STORAGE`）对应上表 `binding`；R2 无需 ID。D1 的 `database_id` 要填入下方 `wrangler.toml`。
 
-4. push 到 `main`，Actions 自动执行 `npm ci && npm run build` 后 `wrangler deploy`。
+2. 把项目推到你的 GitHub 仓库（`main` 分支），并在你的仓库里把 `wrangler.toml` 的 `database_id` 占位符替换成真实 D1 ID。
 
-5. 访问站点 API 验证可正常读写。
+3. 在 **GitHub → 仓库 → Settings → Secrets and variables → Actions** 添加两个 Secret：
+
+   | Secret                  | 说明                                                                                                                                     |
+   | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+   | `CLOUDFLARE_API_TOKEN`  | Cloudflare → 个人资料 → **API Tokens** → Create token，权限：Workers Scripts — Edit、Account Settings — Read、Workers R2 Bucket — Edit、D1 — Edit |
+   | `CLOUDFLARE_ACCOUNT_ID` | Dashboard 右下角账户 ID                                                                                                                     |
+
+4. 仓库已有 [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml)。确认其中 `wrangler.toml` 的 `database_id` 已是真实值（在你本地/仓库中替换占位符）。
+
+5. push 到 `main`，Actions 自动执行 `npm ci && npm run build` 后 `wrangler deploy`。
+
+6. 访问站点 API 验证可正常读写。（D1/R2 绑定写在 `wrangler.toml`，deploy 时会按上表名称自动匹配云端资源）
 
 `deploy.yml` 核心：
 
