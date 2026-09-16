@@ -6,8 +6,8 @@ workers_dev = true
 
 # 静态前端（Vite 构建产物）——由同一个 Worker 一并托管
 [assets]
-directory = "./dist/client"
 binding = "ASSETS"
+directory = "./dist/client"
 not_found_handling = "single-page-application"
 
 # D1 数据库

@@ -1,0 +1,39 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install & build
+        run: npm ci && npm run build
+
+      - name: Publish to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+
+# 说明：
+# - wrangler.toml 的 [assets] 已声明前端目录 ./dist/client，wrangler deploy 会自动把该目录作为静态资源
+#   一并上传；GitHub Actions 里必须先显式跑 npm run build 让目录存在。
+# - 仓库需先在 Cloudflare Dashboard 创建 D1/R2 并填好 database_id；Secrets（SECRET / SETUP_TOKEN / APP_URL）
+#   在 Worker 的 Variables and Secrets 中一次性配置，Actions deploy 不会覆盖它们。
+# - 首次创建 Worker 也可用此 workflow：Cloudflare 会按 wrangler.toml 的 name 自动匹配/创建。

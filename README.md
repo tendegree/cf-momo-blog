@@ -248,19 +248,21 @@ Worker → **Settings** → **Variables and Secrets** → **Add binding**：
 
 把仓库推到 GitHub，让 Cloudflare 在每次 push 后自动构建并部署。两种实现二选一：
 
-#### 选项 A · Dashboard 连接 GitHub（贴合“仅网页控制台”）
+#### 选项 A · Dashboard 连接 GitHub（贴合"仅网页控制台"）
 
-1. 把项目推到你的 GitHub 仓库。
-2. Workers & Pages → **Create** → 选择 **Import from Git**（连接 GitHub 账号）。
-3. 选中仓库 → Production branch 设为 `main`，框架/构建命令设为：
+> **重要说明**：Cloudflare 新 Workers UI 创建页面**没有**"Build command / Root directory / Build output dir"这些字段。这是 Workers 与旧 Pages UI 的入口差异——Worker 的构建配置需要在 **创建完成后**，从 Worker 详情页 **Settings → Build** 进入。本项目因为用 `wrangler.toml` 的 `[assets] directory` 声明了静态前端路径，所以 Cloudflare Builds 只需要跑一个构建命令即可，不需要填 output dir 或 root directory。
 
-   - Build command：`npm run build`
+1. 把项目推到 GitHub 仓库。
+2. Workers & Pages → **Create** → Worker → **Connect to Git** → 连接 GitHub，选中仓库，分支选 `main`。
+3. 首次部署完成后，从该 Worker 详情页进入 **Settings → Build**，修改构建配置：
 
-   - Build output dir：`dist/client`
+   - **Build command**：`npm ci && npm run build`（让 Cloudflare 在 deploy 前先生成 `dist/client`）
+   - **Deploy command**：保持默认 `npx wrangler deploy`（wrangler.toml 里的 `[assets] directory = "./dist/client"` 会被自动识别）
+   - Root directory **留空**（项目就是仓库根目录）
 
-   - Root directory：`/`（若用 monorepo 子目录则填相应前缀）
-4. Deploy → 导入后 Cloudflare 会在每次 push 自动重新构建部署前端。
-5. Worker 的 D1/R2 绑定、`SECRET`/`SETUP_TOKEN`/`APP_URL` 密钥，仍需在该 Worker 的 **Settings → Variables and Secrets / Bindings** 中按方式二第 6–7 步配置一次。
+   保存后 Cloudflare 会在下次 push 时按新配置构建。
+
+4. D1/R2 绑定、`SECRET`/`SETUP_TOKEN`/`APP_URL` 密钥，在 **Settings → Bindings / Variables and Secrets** 中按方式二第 6–7 步配置一次。
 
 #### 选项 B · GitHub Actions + wrangler-action
 
