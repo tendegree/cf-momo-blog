@@ -10,7 +10,8 @@ export function createWeatherService(fetcher: typeof fetch = fetch) {
     pending = (async () => {
       try {
         const res = await fetcher(
-          "https://api.open-meteo.com/v1/forecast?latitude=-33.8688&longitude=151.2093&current=temperature_2m,weather_code&timezone=Australia%2FSydney",
+          // 佛山（China, Foshan）坐标，时区 Asia/Shanghai
+          "https://api.open-meteo.com/v1/forecast?latitude=23.0218&longitude=113.1215&current=temperature_2m,weather_code&timezone=Asia%2FShanghai",
           { signal: AbortSignal.timeout(5000) },
         );
         if (!res.ok) throw new Error("weather unavailable");
