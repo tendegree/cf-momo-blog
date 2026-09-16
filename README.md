@@ -4,7 +4,7 @@
 
 `myblog` 是一个个人 Bento 风格博客空间，由 `momo-blog`（React + TypeScript + SQLite，原部署于 Railway）迁移改造而来，目标平台为 **Cloudflare 免费层**。
 
-迁移后**保留了全部前端样式与业务功能**，仅更换了底层存储：用 Cloudflare 的 **D1** 取代 SQLite、用 **R2** 取代服务器本地文件系统。前端 React + TypeScript 代码与源仓库基本一致，界面、交互、移动端自适应均保持不变。
+迁移后**保留了全部前端样式与业务功能**，仅更换了底层存储：用 Cloudflare 的 **D1** 取代 SQLite、用 **R2** 取代服务器本地文件系统。前端 React + TypeScript 代码与源仓库基本一致，界面、交互、移动端自适应均保持不变。最后R2需要绑卡可用国内的万事达和visa
 
 > 底层存储变更（SQLite → D1、本地文件 → R2）属后端迁移，不影响前端展示与用户操作效果。
 
@@ -138,20 +138,7 @@ npm run build
 
 3. Dashboard → **Workers & Pages → R2 → Create bucket**：命名 `momo-blog-storage`（R2 无需 id）。
 
-### 2. 设置变量（务必添加完整）
-
-在 Cloudflare Worker 的 **Settings → Variables and Secrets** 中，按下表添加（`SECRET` / `SETUP_TOKEN` 类型选 **Secret（加密）**，值只读不显示）：
-
-> 依据项目安全约定：**API 密钥与请求地址必须存放在 Cloudflare Secrets/KV，不硬编码。**
-
-| 变量名                  | 类型         | 是否必填 | 说明                                                                                       |
-| -------------------- | ---------- | ---- | ---------------------------------------------------------------------------------------- |
-| `SECRET`             | Secret（加密） | 必填   | 会话/签名密钥，**≥32 字符**随机串（如 `openssl rand -hex 32` 生成）                                       |
-| `SETUP_TOKEN`        | Secret（加密） | 必填   | 首次创建管理员的初始化令牌，**≥20 字符**随机串                                                              |
-| `APP_URL`            | 普通变量       | 建议   | 你的 https 域名（例如 `https://cf-momo-blog.<你的子域>.workers.dev` 或自定义域名）；设了登录 Cookie 才带 `Secure` |
-| `D1_DATABASE_ID`（可选） | 不适用        | —    | 见下注                                                                                      |
-
-> **关于** **`D1_DATABASE_ID`**：D1 绑定必须使用 wrangler.toml 里的 `database_id`，它不能迁移到运行时 Secret。此表仅列出实际需要的变量，无需添加这个名称。
+###
 
 ### 4. 选择一种 GitHub 部署实现
 
@@ -165,14 +152,14 @@ npm run build
 
 1. 在 GitHub 打开本仓库 → 点右上角 **Fork**（会得到一份属于你的副本）。
 
-2. 在 Cloudflare 创建 R2 与 D1（**名称与 `wrangler.toml` 必须一致**）：
+2. 在 Cloudflare 创建 R2 与 D1（**名称与** **`wrangler.toml`** **必须一致**）R2需要绑卡可用国内的万事达和visa：
 
-   | 资源 | Dashboard 路径 | 创建时的名称 | wrangler.toml 对应项 |
-   |---|---|---|---|
-   | D1 数据库 | Workers & Pages → **D1** → Create database | `momo-blog-db` | `binding = "DB"`、`database_name = "momo-blog-db"` |
-   | R2 存储桶 | Workers & Pages → **R2** → Create bucket | `momo-blog-storage` | `binding = "STORAGE"`、`bucket_name = "momo-blog-storage"` |
+   | 资源     | <br /> | 名称                  | 变量名       |
+   | ------ | ------ | ------------------- | --------- |
+   | D1 数据库 | <br /> | `momo-blog-db`      | `DB`      |
+   | R2 存储桶 | <br /> | `momo-blog-storage` | `STORAGE` |
 
-   建好后回到 D1 详情页，复制顶部 **Database ID**（UUID）。
+   建好后回到 D1 详情页，复制顶部 **Database ID**（UUID）把真实 `database_id` 写进 `wrangler.toml，不写的话打不开网站`。
 
    > 变量名（代码里用的 `env.DB` / `env.STORAGE`）对应上表 `binding`。若你在 Dashboard 手动绑定时名称写错，运行时就会出现 `DB is not defined`。
 
@@ -198,6 +185,27 @@ npm run build
 
 6. 访问站点 API 验证可正常读写。（D1/R2 绑定写在 `wrangler.toml`，deploy 时会按上表名称自动匹配云端资源，无需再手动添加 Binding）
 
+7. 2\. 设置变量（务必添加完整）
+
+   在 Cloudflare Worker 的 **Settings → Variables and Secrets** 中，按下表添加（`SECRET` / `SETUP_TOKEN` 类型选 **Secret（加密）**，值只读不显示）：
+
+   > 依据项目安全约定：**API 密钥与请求地址必须存放在 Cloudflare Secrets/KV，不硬编码。**
+
+   | 变量名                  | 类型         | 是否必填 | 说明                                                                                       |
+   | :------------------- | :--------- | :--- | :--------------------------------------------------------------------------------------- |
+   | `SECRET`             | Secret（加密） | 必填   | 会话/签名密钥，**≥32 字符**随机串（如 `openssl rand -hex 32` 生成）                                       |
+   | `SETUP_TOKEN`        | txt        | 必填   | 首次创建管理员的初始化令牌，**≥20 字符**随机串                                                              |
+   | `APP_URL`            | 普通变量       | 建议   | 你的 https 域名（例如 `https://cf-momo-blog.<你的子域>.workers.dev` 或自定义域名）；设了登录 Cookie 才带 `Secure` |
+   | `D1_DATABASE_ID`（可选） | 不适用        | —    | 见下注                                                                                      |
+
+   > **关于** **`D1_DATABASE_ID`**：D1 绑定必须使用 wrangler.toml 里的 `database_id`，它不能迁移到运行时 Secret。此表仅列出实际需要的变量，无需添加这个名称。
+   >
+   > <br />
+
+> 设置管理员：打开站点 → 滚动到底部点「管理」（win按F11全屏，右下角会有很小的“管理两个字”）→输入**初始化令牌 + 邮箱 + 密码（≥12 位）**，之后即可「编辑页面」。
+>
+> > 令牌规则：若已在 Cloudflare 设置 `SETUP_TOKEN`（加密 Secret），必须与其一致；**未设置时可直接在网页里自行设定**（≥20 字符，首次输入即生效，令牌仅 HMAC 签名存储，管理员创建完成后入口自动关闭）。
+>
 > **特点**：全程在 GitHub + Cloudflare 网页完成，无需本地命令、无需配 GitHub Actions 凭据，适合不想碰 CLI 的用户。对应 Cloudflare 的「Git integration」能力。
 
 ***
@@ -206,12 +214,12 @@ npm run build
 
 在**你自己的仓库**里启用 GitHub Actions，push 到 `main` 即自动构建并部署（适合本地改代码、希望有完整 CI 的开发者）。
 
-1. 在 Cloudflare 创建 R2 与 D1（**名称与 `wrangler.toml` 必须一致**）：
+1. 在 Cloudflare 创建 R2 与 D1（**名称与** **`wrangler.toml`** **必须一致**）：
 
-   | 资源 | Dashboard 路径 | 创建时的名称 | wrangler.toml 对应项 |
-   |---|---|---|---|
-   | D1 数据库 | Workers & Pages → **D1** → Create database | `momo-blog-db` | `binding = "DB"`、`database_name = "momo-blog-db"` |
-   | R2 存储桶 | Workers & Pages → **R2** → Create bucket | `momo-blog-storage` | `binding = "STORAGE"`、`bucket_name = "momo-blog-storage"` |
+   | 资源     | Dashboard 路径                               | 创建时的名称              | wrangler.toml 对应项                                         |
+   | ------ | ------------------------------------------ | ------------------- | --------------------------------------------------------- |
+   | D1 数据库 | Workers & Pages → **D1** → Create database | `momo-blog-db`      | `binding = "DB"`、`database_name = "momo-blog-db"`         |
+   | R2 存储桶 | Workers & Pages → **R2** → Create bucket   | `momo-blog-storage` | `binding = "STORAGE"`、`bucket_name = "momo-blog-storage"` |
 
    建好后回到 D1 详情页，复制顶部 **Database ID**（UUID）。
 
@@ -263,10 +271,25 @@ jobs:
 > - D1/R2 绑定在云端已创建并写了 `wrangler.toml`，`wrangler deploy` 会按 `name`/绑定匹配既有 Worker 与资源。
 >
 > - Secrets（`SECRET`/`SETUP_TOKEN`/`APP_URL`）在 Dashboard 的 Worker 设置里添加一次即可；`wrangler.toml` 已开启 `keep_vars = true`，Actions 每次 deploy 不会覆盖它们。
+>
+> - 2\. 设置变量（务必添加完整）
+>
+>   在 Cloudflare Worker 的 **Settings → Variables and Secrets** 中，按下表添加（`SECRET` / `SETUP_TOKEN` 类型选 **Secret（加密）**，值只读不显示）：
+>
+>   > 依据项目安全约定：**API 密钥与请求地址必须存放在 Cloudflare Secrets/KV，不硬编码。**
+>
+>   | 变量名                  | 类型         | 是否必填 | 说明                                                                                       |
+>   | :------------------- | :--------- | :--- | :--------------------------------------------------------------------------------------- |
+>   | `SECRET`             | Secret（加密） | 必填   | 会话/签名密钥，**≥32 字符**随机串（如 `openssl rand -hex 32` 生成）                                       |
+>   | `SETUP_TOKEN`        | Secret（加密） | 必填   | 首次创建管理员的初始化令牌，**≥20 字符**随机串                                                              |
+>   | `APP_URL`            | 普通变量       | 建议   | 你的 https 域名（例如 `https://cf-momo-blog.<你的子域>.workers.dev` 或自定义域名）；设了登录 Cookie 才带 `Secure` |
+>   | `D1_DATABASE_ID`（可选） | 不适用        | —    | 见下注                                                                                      |
+>
+>   > **关于** **`D1_DATABASE_ID`**：D1 绑定必须使用 wrangler.toml 里的 `database_id`，它不能迁移到运行时 Secret。此表仅列出实际需要的变量，无需添加这个名称。
 
 ### 5. 首次初始化管理员
 
-打开站点 → 滚动到底部点「管理」→「创建你的管理员账号」，输入**初始化令牌 + 邮箱 + 密码（≥12 位）**，之后即可「编辑页面」。
+打开站点 → 滚动到底部点「管理」（win按F11全屏，右下角会有很小的“管理两个字”）→输入**初始化令牌 + 邮箱 + 密码（≥12 位）**，之后即可「编辑页面」。
 
 > 令牌规则：若已在 Cloudflare 设置 `SETUP_TOKEN`（加密 Secret），必须与其一致；**未设置时可直接在网页里自行设定**（≥20 字符，首次输入即生效，令牌仅 HMAC 签名存储，管理员创建完成后入口自动关闭）。
 
@@ -276,7 +299,7 @@ jobs:
 
 - 访问部署后的域名即为主页；首页默认展示演示数据（执行过 `seed`）。
 
-- 点右上角「登录」进入管理员界面：
+- 点右下角「登录」进入管理员界面：
 
   - 首次登录用「创建你的管理员账号」完成初始化；
 
