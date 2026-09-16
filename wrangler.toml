@@ -1,26 +1,23 @@
-name = "momo-blog"
+name = "momo-blog-cf"
 main = "server/worker.ts"
 compatibility_date = "2026-06-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 # 静态前端（Vite 构建产物）——由同一个 Worker 一并托管
+# 注意：[assets] 是 wrangler 自动上传静态文件用的，不是 Runtime binding 声明，
+# 不会触发 Cloudflare API 的绑定校验。部署成功后 Cloudflare 自动提供 ASSETS Fetcher 绑定。
 [assets]
 binding = "ASSETS"
 directory = "./dist/client"
 not_found_handling = "single-page-application"
 
-# D1 数据库
-# database_id 在 Cloudflare Dashboard 创建 D1 后填入（或运行 wrangler d1 create momo-blog-db 自动替换）
-[[d1_databases]]
-binding = "DB"
-database_name = "momo-blog-db"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
-
-# R2 存储（媒体文件）
-[[r2_buckets]]
-binding = "STORAGE"
-bucket_name = "momo-blog-storage"
+# 以下 Runtime Bindings 在 Worker 首部署成功后，通过 Cloudflare Dashboard
+# （Worker → Settings → Bindings）手动添加，避免占位符 ID 被 API 拒掉（code 10021）：
+#   1. D1 Database  → 变量名 DB   → 指向 momo-blog-db
+#   2. R2 Bucket    → 变量名 STORAGE → 指向 momo-blog-storage
+# Secrets（Settings → Variables and Secrets）：
+#   SECRET / SETUP_TOKEN / APP_URL
 
 [observability]
 enabled = true
