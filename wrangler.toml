@@ -12,12 +12,24 @@ binding = "ASSETS"
 directory = "./dist/client"
 not_found_handling = "single-page-application"
 
-# 以下 Runtime Bindings 在 Worker 首部署成功后，通过 Cloudflare Dashboard
-# （Worker → Settings → Bindings）手动添加，避免占位符 ID 被 API 拒掉（code 10021）：
-#   1. D1 Database  → 变量名 DB   → 指向 momo-blog-db
-#   2. R2 Bucket    → 变量名 STORAGE → 指向 momo-blog-storage
-# Secrets（Settings → Variables and Secrets）：
-#   SECRET / SETUP_TOKEN / APP_URL
+# 重要：采用 Cloudflare“方式三 · Git 集成”部署时，绑定必须以 wrangler.toml 为准。
+# 每次 push 都会执行 `npx wrangler deploy`，它会把本文件声明的绑定作为唯一真源，
+# 因此 D1/R2 绑定必须写在这里（而不是仅靠 Dashboard 手动加，那会被 deploy 覆盖）。
+# DB / STORAGE 是资源引用（非密钥），可安全提交。
+
+# D1 数据库
+[[d1_databases]]
+binding = "DB"
+database_name = "momo-blog-db"
+database_id = "9f3a5555-ffb1-4cb0-abeb-a634a22c08c7"
+
+# R2 存储（媒体文件）
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "momo-blog-storage"
+
+# Secrets（SECRET / SETUP_TOKEN / APP_URL）通过 Dashboard → Variables and Secrets 添加，
+# wrangler deploy 不会删除 secrets，与上方资源绑定不冲突。
 
 [observability]
 enabled = true
