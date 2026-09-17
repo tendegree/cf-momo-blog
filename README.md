@@ -1,6 +1,6 @@
 # MyBlog · Personal Bento Space
 
-源项目地址：<https://github.com/snowhejia/momo-blog>
+
 
 `myblog` 是一个个人 Bento 风格博客空间，由 `momo-blog`（React + TypeScript + SQLite，原部署于 Railway）迁移改造而来，目标平台为 **Cloudflare 免费层**。
 
@@ -328,6 +328,7 @@ jobs:
 - **图片/音频上传**：图片在浏览器端压缩为 WebP，音频仅做元数据校验（Worker 环境不支持 ffmpeg），属预期行为。
 
 - **冷启动建表**：建表是幂等的，首访勿并发，避免重复迁移。
+- 源项目地址：<https://github.com/snowhejia/momo-blog>
 
 - 更多迁移细节与坑点见 [DEPLOY.md](./DEPLOY.md)。
 
